@@ -17,7 +17,7 @@ def test_path(swagger_20):
 @pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
 def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
     base_url = converter(base_url)
-    endpoint = Endpoint("/api/success", "GET", {}, swagger_20)
+    endpoint = Endpoint("/success", "GET", {}, swagger_20)
     kwargs = {"endpoint": endpoint, "cookies": {"TOKEN": "secret"}}
     if override:
         case = Case(**kwargs)
@@ -42,7 +42,7 @@ def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
 @pytest.mark.parametrize("override", (False, True))
 @pytest.mark.filterwarnings("always")
 def test_call(override, base_url, swagger_20):
-    endpoint = Endpoint("/api/success", "GET", {}, swagger_20)
+    endpoint = Endpoint("/success", "GET", {}, swagger_20)
     kwargs = {"endpoint": endpoint}
     if override:
         case = Case(**kwargs)

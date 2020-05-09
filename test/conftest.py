@@ -9,7 +9,7 @@ import schemathesis.cli
 from schemathesis.extra._aiohttp import run_server
 
 from .apps import Endpoint, _aiohttp, _flask
-from .utils import make_schema
+from .utils import get_schema_path, make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
 
@@ -71,13 +71,13 @@ def server(_app):
 @pytest.fixture()
 def base_url(server, app):
     """Base URL for the running application."""
-    return f"http://127.0.0.1:{server['port']}"
+    return f"http://127.0.0.1:{server['port']}/api"
 
 
 @pytest.fixture()
-def schema_url(base_url):
+def schema_url(server, app):
     """URL of the schema of the running application."""
-    return f"{base_url}/swagger.yaml"
+    return f"http://127.0.0.1:{server['port']}/swagger.yaml"
 
 
 @pytest.fixture(scope="session")
@@ -246,6 +246,11 @@ def complex_schema(testdir):
     (common / "attributes.yaml").write_text(yaml.dump(ATTRIBUTES), "utf8")
     (common / "attributes_nested.yaml").write_text(yaml.dump(ATTRIBUTES_NESTED), "utf8")
     return str(root)
+
+
+@pytest.fixture(name="get_schema_path")
+def _get_schema_path():
+    return get_schema_path
 
 
 @pytest.fixture(scope="session")

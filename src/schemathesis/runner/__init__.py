@@ -257,8 +257,6 @@ def load_schema(
         else:
             loader_options.update(dict_true_values(headers=headers, auth=auth, auth_type=auth_type))
 
-    if "base_url" not in loader_options and not isinstance(schema_uri, dict):
-        loader_options["base_url"] = get_base_url(schema_uri)
     if loader is loaders.from_uri and loader_options.get("auth"):
         loader_options["auth"] = get_requests_auth(loader_options["auth"], loader_options.pop("auth_type", None))
 

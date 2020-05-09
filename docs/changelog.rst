@@ -11,6 +11,20 @@ Added
 
 - New ``before_add_examples`` hook. `#571`_
 
+Changed
+~~~~~~~
+
+- **BREAKING**. Base URL handling. ``base_url`` now is treated as one with a base path included.
+  You should pass a full base URL now instead:
+
+.. code:: bash
+
+    schemathesis run --base-url=http://127.0.0.1:8080/api/v2 ...
+
+    This value will override ``basePath`` / ``servers[0].url`` defined in your schema if you use Open API 2.0 / 3.0 respectively.
+    Previously if you pass a base URL like the one above it was concatenated with the base path defined in the schema which
+    lead to lack of ability to redefine the base path. `#511`_
+
 `1.5.1`_ - 2020-05-08
 ---------------------
 
@@ -1053,6 +1067,7 @@ Fixed
 .. _#521: https://github.com/kiwicom/schemathesis/issues/521
 .. _#519: https://github.com/kiwicom/schemathesis/issues/519
 .. _#513: https://github.com/kiwicom/schemathesis/issues/513
+.. _#511: https://github.com/kiwicom/schemathesis/issues/511
 .. _#504: https://github.com/kiwicom/schemathesis/issues/504
 .. _#503: https://github.com/kiwicom/schemathesis/issues/503
 .. _#499: https://github.com/kiwicom/schemathesis/issues/499

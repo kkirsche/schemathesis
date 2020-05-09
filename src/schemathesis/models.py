@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from enum import IntEnum
 from logging import LogRecord
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union, cast
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import attr
 import requests
@@ -41,6 +41,10 @@ class Case:
         return self.endpoint.path
 
     @property
+    def full_path(self) -> str:
+        return self.endpoint.full_path
+
+    @property
     def method(self) -> str:
         return self.endpoint.method
 
@@ -62,7 +66,14 @@ class Case:
 
     def get_code_to_reproduce(self, headers: Optional[Dict[str, Any]] = None) -> str:
         """Construct a Python code to reproduce this case with `requests`."""
-        base_url = self.base_url or "http://localhost"
+        # refactor
+        parts = urlsplit(self.base_url)
+        base_url: Optional[str]
+        if not parts.hostname:
+            path = cast(str, parts.path or "")
+            base_url = urlunsplit(("http", "localhost", path or "", "", ""))
+        else:
+            base_url = self.base_url
         kwargs = self.as_requests_kwargs(base_url)
         if headers:
             final_headers = kwargs["headers"] or {}
@@ -131,7 +142,6 @@ class Case:
         else:
             close_session = False
 
-        base_url = self._get_base_url(base_url)
         data = self.as_requests_kwargs(base_url)
         if headers is not None:
             data["headers"] = {**(data["headers"] or {}), **headers}
@@ -157,7 +167,7 @@ class Case:
             extra = {"json": self.body}
         return {
             "method": self.method,
-            "path": self.formatted_path,
+            "path": self.endpoint.schema.get_full_path(self.formatted_path),
             "headers": final_headers,
             "query_string": self.query,
             **extra,
@@ -245,6 +255,9 @@ class EndpointDefinition:
 class Endpoint:
     """A container that could be used for test cases generation."""
 
+    # `path` does not contain `basePath`
+    # Example <scheme>://<host>/<basePath>/users - "/users" is path
+    # https://swagger.io/docs/specification/2-0/api-host-and-base-path/
     path: str = attr.ib()  # pragma: no mutate
     method: str = attr.ib()  # pragma: no mutate
     definition: EndpointDefinition = attr.ib()  # pragma: no mutate
@@ -257,6 +270,10 @@ class Endpoint:
     query: Optional[Query] = attr.ib(default=None)  # pragma: no mutate
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
     form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
+
+    @property
+    def full_path(self) -> str:
+        return self.schema.get_full_path(self.path)
 
     def as_strategy(self, hooks: Optional["HookDispatcher"] = None) -> SearchStrategy:
         from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel
@@ -294,7 +311,13 @@ class Request:
     @classmethod
     def from_case(cls, case: Case, session: requests.Session) -> "Request":
         """Create a new `Request` instance from `Case`."""
-        base_url = case.base_url or "http://localhost"
+        parts = urlsplit(case.base_url)
+        base_url: Optional[str]
+        if not parts.hostname:
+            path = cast(str, parts.path or "")
+            base_url = urlunsplit(("http", "localhost", path, "", ""))
+        else:
+            base_url = case.base_url
         kwargs = case.as_requests_kwargs(base_url)
         request = requests.Request(**kwargs)
         prepared = session.prepare_request(request)  # type: ignore

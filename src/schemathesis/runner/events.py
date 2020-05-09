@@ -35,7 +35,7 @@ class Initialized(ExecutionEvent):
         return cls(
             endpoints_count=schema.endpoints_count,
             location=schema.location,
-            base_url=schema.base_url,
+            base_url=schema.get_base_url(),
             specification_name=schema.verbose_name,
         )
 
@@ -52,7 +52,7 @@ class BeforeExecution(ExecutionEvent):
 
     @classmethod
     def from_endpoint(cls, endpoint: Endpoint) -> "BeforeExecution":
-        return cls(method=endpoint.method, path=endpoint.path)
+        return cls(method=endpoint.method, path=endpoint.full_path)
 
 
 @attr.s(slots=True)  # pragma: no mutate

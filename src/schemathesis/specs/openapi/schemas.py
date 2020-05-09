@@ -2,7 +2,7 @@
 import itertools
 from copy import deepcopy
 from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urlsplit
 
 import jsonschema
 from requests.structures import CaseInsensitiveDict
@@ -26,14 +26,6 @@ class BaseOpenAPISchema(BaseSchema):
     @property  # pragma: no mutate
     def spec_version(self) -> str:
         raise NotImplementedError
-
-    @property
-    def base_path(self) -> str:
-        raise NotImplementedError
-
-    def get_full_path(self, path: str) -> str:
-        """Compute full path for the given path."""
-        return urljoin(self.base_path, path.lstrip("/"))  # pragma: no mutate
 
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
@@ -78,29 +70,22 @@ class BaseOpenAPISchema(BaseSchema):
                     # To prevent recursion errors we need to pass not resolved schema as well
                     # It could be used for response validation
                     raw_definition = EndpointDefinition(raw_methods[method], scope)
-                    yield self.make_endpoint(full_path, method, parameters, resolved_definition, raw_definition)
+                    yield self.make_endpoint(path, method, parameters, resolved_definition, raw_definition)
         except (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError):
             raise InvalidSchema("Schema parsing failed. Please check your schema.")
 
     def make_endpoint(  # pylint: disable=too-many-arguments
         self,
-        full_path: str,
+        path: str,
         method: str,
         parameters: Iterator[Dict[str, Any]],
         resolved_definition: Dict[str, Any],
         raw_definition: EndpointDefinition,
     ) -> Endpoint:
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
-        base_url = self.base_url
-        if base_url is not None:
-            base_url = base_url.rstrip("/")  # pragma: no mutate
+        base_url = self.get_base_url()
         endpoint = Endpoint(
-            path=full_path,
-            method=method.upper(),
-            definition=raw_definition,
-            base_url=base_url,
-            app=self.app,
-            schema=self,
+            path=path, method=method.upper(), definition=raw_definition, base_url=base_url, app=self.app, schema=self,
         )
         for parameter in parameters:
             self.process_parameter(endpoint, parameter)
@@ -146,13 +131,8 @@ class SwaggerV20(BaseOpenAPISchema):
     def verbose_name(self) -> str:
         return f"Swagger {self.spec_version}"
 
-    @property
-    def base_path(self) -> str:
-        """Base path for the schema."""
-        path: str = self.raw_schema.get("basePath", "/")  # pragma: no mutate
-        if not path.endswith("/"):
-            path += "/"
-        return path
+    def _get_base_path(self) -> str:
+        return self.raw_schema.get("basePath", "/")
 
     def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         if parameter["in"] == "path":
@@ -237,31 +217,25 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     def verbose_name(self) -> str:
         return f"Open API {self.spec_version}"
 
-    @property
-    def base_path(self) -> str:
-        """Base path for the schema."""
+    def _get_base_path(self) -> str:
         servers = self.raw_schema.get("servers", [])
         if servers:
             # assume we're the first server in list
             server = servers[0]
             url = server["url"].format(**{k: v["default"] for k, v in server.get("variables", {}).items()})
-            path = urlsplit(url).path
-        else:
-            path = "/"
-        if not path.endswith("/"):
-            path += "/"
-        return path
+            return urlsplit(url).path
+        return "/"
 
     def make_endpoint(  # pylint: disable=too-many-arguments
         self,
-        full_path: str,
+        path: str,
         method: str,
         parameters: Iterator[Dict[str, Any]],
         resolved_definition: Dict[str, Any],
         raw_definition: EndpointDefinition,
     ) -> Endpoint:
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
-        endpoint = super().make_endpoint(full_path, method, parameters, resolved_definition, raw_definition)
+        endpoint = super().make_endpoint(path, method, parameters, resolved_definition, raw_definition)
         if "requestBody" in resolved_definition:
             self.process_body(endpoint, resolved_definition["requestBody"])
         return endpoint
